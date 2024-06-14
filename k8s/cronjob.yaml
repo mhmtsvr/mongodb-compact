@@ -1,0 +1,69 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mongodb-compact
+spec:
+  schedule: "@yearly"
+  timeZone: "Canada/Eastern"
+  suspend: true # intended to run manually
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 65534
+          terminationGracePeriodSeconds: 120
+          restartPolicy: Never
+          # If you use a private repository, 
+          # imagePullSecrets:
+          #   - name: dockerhub-registry
+          serviceAccountName: default
+          containers:
+            - name: mongodb-compact
+              image: mehmetsever/mongodb-compact:latest
+              imagePullPolicy: Always
+              command:
+                - "/bin/sh"
+                - "-ec"
+                - python main.py
+              env:
+                  # MongoDB Credentials
+                - name: DB_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: database-secret
+                      key: address
+                - name: DB_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: database-secret
+                      key: username
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: database-secret
+                      key: password
+                - name: DB_REPLICASET
+                  valueFrom:
+                    secretKeyRef:
+                      name: database-secret
+                      key: replicaset
+                # Uncomment if you want to compact a single host at a time
+                # - name: DB_SINGLE_HOST
+                #   value: "host:27017"
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - all
+                  add: ['NET_BIND_SERVICE']
+              resources:
+                requests:
+                  memory: "200Mi"
+                limits:
+                  memory: "200Mi"
